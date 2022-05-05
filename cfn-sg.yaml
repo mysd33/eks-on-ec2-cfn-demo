@@ -75,64 +75,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${StackPrefix}-PubALB-SG
-  #Security Group of Private ALB for Backend
-  PrivateALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Access to the private load balancer
-      VpcId:
-        Fn::ImportValue: !Sub ${StackPrefix}-VPC-ID
-      SecurityGroupIngress:        
-        - CidrIp:
-            Fn::ImportValue: !Sub ${StackPrefix}-VPC-CIDR
-          IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          Description: Ingress from VPC
-        - CidrIp:
-            Fn::ImportValue: !Sub ${StackPrefix}-VPC-CIDR
-          IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          Description: Ingress from VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${StackPrefix}-PrivALB-SG          
-  
-  #Security Group of Public ECS Cluster for BFF
-  PublicECSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Access only from public ALB
-      VpcId:
-        Fn::ImportValue: !Sub ${StackPrefix}-VPC-ID
-      SecurityGroupIngress:        
-        - SourceSecurityGroupId: !Ref PublicALBSecurityGroup
-          IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          Description: Ingress from the public ALB 
-      Tags:
-        - Key: Name
-          Value: !Sub ${StackPrefix}-PubECS-SG  
-  
-  #Security Group of Private ECS Cluster for Backend
-  PrivateECSSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Access only from private ALB
-      VpcId:
-        Fn::ImportValue: !Sub ${StackPrefix}-VPC-ID
-      SecurityGroupIngress:        
-        - SourceSecurityGroupId: !Ref PrivateALBSecurityGroup
-          IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          Description: Ingress from the private ALB 
-      Tags:
-        - Key: Name
-          Value: !Sub ${StackPrefix}-PrivECS-SG  
-
+ 
 
 Outputs:
   BastionSecurityGroupID:
@@ -150,18 +93,3 @@ Outputs:
     Value:  !Ref PublicALBSecurityGroup
     Export: 
       Name: !Sub ${StackPrefix}-PublicALBSecurityGroup-ID
-  PrivateALBSecurityGroupID:
-    Description: PrivateALBSecurityGroup ID
-    Value:  !Ref PrivateALBSecurityGroup
-    Export: 
-      Name: !Sub ${StackPrefix}-PrivateALBSecurityGroup-ID
-  PublicECSSecurityGroupID:
-    Description: PublicECSSecurityGroup ID
-    Value:  !Ref PublicECSSecurityGroup
-    Export: 
-      Name: !Sub ${StackPrefix}-PublicECSSecurityGroup-ID
-  PrivateECSSecurityGroupID:
-    Description: PrivateECSSecurityGroup ID
-    Value:  !Ref PrivateECSSecurityGroup
-    Export: 
-      Name: !Sub ${StackPrefix}-PrivateECSSecurityGroup-ID
