@@ -287,8 +287,6 @@ helm uninstall aws-load-balancer-controller -n kube-system
 ```
 
 ```sh
-eksctl delete fargateprofile --name fp-demo-app --cluster %EKS_CLUSTER_NAME%
-
 eksctl delete iamserviceaccount ^
   --cluster=%EKS_CLUSTER_NAME% ^
   --namespace=kube-system ^
