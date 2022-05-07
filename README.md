@@ -47,8 +47,10 @@ aws cloudformation create-stack --stack-name EKS-IAM-Stack --template-body file:
 * 別途、以下の2つのSpringBootAPのプロジェクトが以下のリポジトリ名でCodeCommitにある前提
   * backend-for-frontend
     * BFFのAP
+    * [ここ](../backend-for-frontend)にあります。
   * backend
     * BackendのAP
+    * [ここ](../backend)にあります。
 * TBD: CD変更検知用のk8sマニフェストファイルのリポジトリ
 
 ### 2. ECRの作成
