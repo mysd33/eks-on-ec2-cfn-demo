@@ -40,14 +40,10 @@ vpc:
 #privateCluster:
 #  enabled: true
 
-fargateProfiles:
-  - name: fp-default
-    selectors:
-      - namespace: default
-      - namespace: kube-system
-  - name: fp-demo-app
-    selectors:
-      - namespace: demo-app
+#TODO:nodeGroups
+nodeGroups:
+  #TBD
+
 
 cloudWatch:
   clusterLogging:

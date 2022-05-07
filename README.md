@@ -132,6 +132,9 @@ export PRIV_SUBNET2_ID
 export ECR_HOST
 ```
 ### 2. EKSクラスタの作成
+* TODO: ekscluster.yamlをon EC2版に修正(node-group定義追加)
+  * https://eksctl.io/usage/managing-nodegroups/
+
 * 以下のeksctlコマンドの実行を実行しEKSクラスタを作成
 ```sh
 #Dry Run
