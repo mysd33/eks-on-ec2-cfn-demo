@@ -10,13 +10,21 @@
 
 * メトリックスのモニタリング
   * 現状、未対応。今後対応予定。
-  * AWS Distro for OpenTelemetry (ADOT)を使用してメトリクスをCloudWatch Containe Insightsに送信  
+  * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントクラスター上のDaemonSetとしてセットアップ  
+
 * ログの転送
   * 現状、未対応。今後対応予定。
-  * Fluent Bitをベースにした組み込みのログルーターを設定し、CloudWatch Logsへログを送信
+  * CloudWatch Logsへログを送信するDaemonSetとしてFluentBitをセットアップ 
   
 * オートスケーリング
-  * 現状、未対応。今後対応予定。
+  * 現状、未対応。今後対応予定。    
+  * Cluster Autoscaler    
+    * https://eksctl.io/usage/autoscaling/
+    * https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/autoscaling.html
+  * Horizontal Pod AutoScaler
+    * https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/horizontal-pod-autoscaler.html
+    * メトリックスサーバのインストールが必要
+      * https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/metrics-server.html
 
 * CI/CD
   * CodeBuildによる自動ビルド、ECRプッシュに対応。
@@ -132,10 +140,7 @@ export PRIV_SUBNET2_ID
 export ECR_HOST
 ```
 ### 2. EKSクラスタの作成
-* TODO: ekscluster.yamlをon EC2版に修正(node-group定義追加)
-  * https://eksctl.io/usage/managing-nodegroups/
-
-* 以下のeksctlコマンドの実行を実行しEKSクラスタを作成
+* 以下のeksctlコマンドの実行を実行し、ManagedNodeGroupでEKSクラスタを作成
 ```sh
 #Dry Run
 envsubst < ekscluster.yaml | eksctl create cluster -f - --dry-run
@@ -161,6 +166,8 @@ kubectl get pods --all-namespaces -o wide
     * https://eksctl.io/usage/vpc-networking/
   * コントロールプレーンのCloudWatch Logsの有効化
     * https://eksctl.io/usage/cloudwatch-cluster-logging/
+  * Managed NodeGroup
+    * https://eksctl.io/usage/eks-managed-nodes/
  
 * TODO: ClusterConfigファイルに、addonsでaws-load-balancer-controllerの記載を追加するとどうなるのか試してみる
 

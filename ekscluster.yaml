@@ -17,6 +17,11 @@ iam:
       namespace: kube-system
     wellKnownPolicies:
       awsLoadBalancerController: true
+  - metadata:
+      name: cluster-autoscaler
+      namespace: kube-system      
+    wellKnownPolicies:
+      autoScaler: true
 
 vpc:
   subnets:    
@@ -36,14 +41,25 @@ vpc:
 #    version: latest
 #    wellKnownPolicies:
 #      awsLoadBalancerController: true
+#  - name: cluster-autoscaler
+#    version: latest
+#    wellKnownPolicies:
+#      autoScaler: true  
 
 #privateCluster:
 #  enabled: true
 
-#TODO:nodeGroups
-nodeGroups:
-  #TBD
-
+managedNodeGroups:
+  - name: managed-ng-1
+    labels:
+      role: workers
+    #instanceType: m5.large
+    instanceType: t2.small
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    volumeSize: 80
+    privateNetworking: true
 
 cloudWatch:
   clusterLogging:
