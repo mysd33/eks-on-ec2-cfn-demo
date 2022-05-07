@@ -227,7 +227,7 @@ kubectl logs -n kube-system deployment.apps/aws-load-balancer-controller
 * データプレーンのログ、メトリックス
   * EKS on EC2の場合、以下の対応が必要
     * CloudWatch Logsへログを送信するDaemonSetとしてFluentBitをセットアップ
-    * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントクラスター上のDaemonSetとしてセットアップ
+    * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントをクラスター上のDaemonSetとしてセットアップ
       * 参考
         * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs-FluentBit.html
         * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/deploy-container-insights-EKS.html
