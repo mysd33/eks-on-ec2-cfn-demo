@@ -10,7 +10,7 @@
 
 * メトリックスのモニタリング
   * 現状、未対応。今後対応予定。
-  * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントクラスター上のDaemonSetとしてセットアップ  
+  * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントをクラスター上のDaemonSetとしてセットアップ  
 
 * ログの転送
   * 現状、未対応。今後対応予定。
