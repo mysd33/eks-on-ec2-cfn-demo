@@ -8,14 +8,13 @@
   * 現時点の構成は、以下の通り
 ![システム構成図](img/eks-rolling-update-current.png)
 
-* メトリックスのモニタリング
-  * 現状、未対応。今後対応予定。
-  * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントをクラスター上のDaemonSetとしてセットアップ  
-
 * ログの転送
-  * 現状、未対応。今後対応予定。
-  * CloudWatch Logsへログを送信するDaemonSetとしてFluentBitをセットアップ 
-  
+  * コントロールプレーンのログをCloudWatch Logsへログを送信
+  * データプレーンのAPログをFluentBitをDaemonSetとしてセットアップし、CloudWatch Logsへ送信    
+
+* メトリックスのモニタリング  
+  * CloudWatchエージェントをDaemonSetとしてセットアップし、メトリックスをCloudWatch Container Insightsに送信
+
 * オートスケーリング
   * 現状、未対応。今後対応予定。    
   * Cluster Autoscaler    
@@ -224,16 +223,50 @@ kubectl logs -n kube-system deployment.apps/aws-load-balancer-controller
 * コントロールプレーンのログ
   * クラスタ作成時のClusterConfigファイルの設定により以下のロググループにログ出力
     * /aws/eks/demo-eks-cluster/cluster
-* データプレーンのログ、メトリックス
+* データプレーンのログ
   * EKS on EC2の場合、以下の対応が必要
-    * CloudWatch Logsへログを送信するDaemonSetとしてFluentBitをセットアップ
-    * CloudWatch ContainerInsightsへメトリクスをCloudWatchに送信するCloudWatchエージェントをクラスター上のDaemonSetとしてセットアップ
+    * CloudWatch Logsへログを送信しメトリクス表示するFluentBitをDaemonSetとしてセットアップ
       * 参考
         * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs-FluentBit.html
-        * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/deploy-container-insights-EKS.html
-  * TBD: 手順
+* データプレーンのメトリックス    
+  * EKS on EC2の場合、以下の対応が必要
+    * CloudWatch Container Insightsへメトリクスを収集するようCloudWatchエージェントをDaemonSetとしてセットアップ
+      * 参考
+        * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-metrics.html
+    * AWS Distro for OpenTelemetry (ADOT)を使用してクラスター上のDaemonSetとしてセットアップする方法もあるが、今回は実施していない。
+      * 参考
+        * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-EKS-otel.html
+        * https://aws-otel.github.io/docs/getting-started/container-insights/eks-infra
+* 本手順では、ログとメトリックスの設定を一度に行うクイックスタートのマニフェストを使用して作成
+  * 参考
+    * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-EKS-quickstart.html
 
-### 5. k8sリソースの作成、APの起動
+* ワーカノードのIAMロールにCloudWatchAgentServerPolicyポリシーをアタッチ
+```sh
+#マネージドコンソール等で、EC2のワーカーノードのIAMロールを確認
+WORKER_NODE_ROLE_NAME=（ワーカーノードのインスタンスのIAMロール名）
+#例：IAMロールARNの後ろの部分
+#WORKER_NODE_ROLE_NAME=eksctl-demo-eks-cluster-nodegroup-NodeInstanceRole-1LMOJT8MZM3F
+
+aws iam attach-role-policy \
+  --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
+  --role-name $WORKER_NODE_ROLE_NAME
+```
+
+```sh
+FluentBitHttpPort='2020'
+FluentBitReadFromHead='Off'
+[[ ${FluentBitReadFromHead} = 'On' ]] && FluentBitReadFromTail='Off'|| FluentBitReadFromTail='On'
+[[ -z ${FluentBitHttpPort} ]] && FluentBitHttpServer='Off' || FluentBitHttpServer='On'
+curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluent-bit-quickstart.yaml | sed 's/{{cluster_name}}/'${EKS_CLUSTER_NAME}'/;s/{{region_name}}/'${AWS_REGION}'/;s/{{http_server_toggle}}/"'${FluentBitHttpServer}'"/;s/{{http_server_port}}/"'${FluentBitHttpPort}'"/;s/{{read_from_head}}/"'${FluentBitReadFromHead}'"/;s/{{read_from_tail}}/"'${FluentBitReadFromTail}'"/' | kubectl apply -f - 
+```
+
+* CloudWatchエージェントとFulentBitがデプロイされたことを確認
+```sh
+kubectl get pods -n amazon-cloudwatch
+```
+
+### 5. AP用のk8sリソースの作成、APの起動
 * Namespaceの作成
 ```sh
 cd k8s
@@ -244,6 +277,9 @@ kubectl apply -f k8s-demo-app-namespace.yaml
 ```sh
 #Deploymentの作成
 envsubst < k8s-backend-deployment.yaml | kubectl apply -f -
+
+#Podの起動確認しておくとよい
+kubectl get pod -n demo-app
 
 #CLBロードバランサの作成（on EC2のみで動作）の場合は、Service/Ingressを作成せず以下実行
 #kubectl apply -f k8s-backend-clb.yaml
@@ -260,12 +296,16 @@ kubectl get ingress/backend-app-ingress -n demo-app
 
 * BFF APの作成
 ```sh
-#Deploymentの作成
 #kubectl get ingress/backend-app-ingress -n demo-appでADDRESSからBackend向けのALBのDNSを取得し設定
 BACKEND_LB_DNS=(Backend APのロードバランサ)
 #例：BACKEND_LB_DNS=a5027f47adc0d4c10bc2da33b708b8fc-1647541580.ap-northeast-1.elb.amazonaws.com
 export BACKEND_LB_DNS
+
+#Deploymentの作成
 envsubst < k8s-bff-deployment.yaml | kubectl apply -f -
+
+#Podの起動確認しておくとよい
+kubectl get pod -n demo-app
 
 #CLBロードバランサの作成（on EC2のみで動作）の場合は、Service/Ingressを作成せず以下実行
 #kubectl apply -f k8s-bff-clb.yaml
@@ -283,19 +323,25 @@ kubectl get ingress/bff-app-ingress -n demo-app
 ### 6. APの実行確認
 * TODO: bationのEC2とSecurityGroupの作成手順の追加
 
-* Backend AP
+* Backendアプリケーションの確認
   * VPC内のbationを作成し、curlコマンドで動作確認
 ```sh
 curl http://(ロードバランサのDNS名)/backend/api/v1/users
 ```
 
-* Bff AP
+* BFFアプリケーションの確認
   * ブラウザで確認
     * サンプルAPは、ECS用のCloudFormationサンプルと共用しているので、画面に「Hello! AWS ECS sample!」と表示されるが気にしなくてよい。
 ```sh
 http://(ロードバランサのDNS名)/backend-for-frontend/index.html
 ```
-
+* APログの確認
+  * うまく動作しない場合、APログ等にエラーが出ていないか確認するとよい
+  * Cloud Watch Logの以下のロググループ
+    * /aws/containerinsights/demo-eks-cluster/application
+      * ip-X-X-X-X.ap-northeast-1.compute.internal-application.var.log.containers.bff-app-XXXXX
+      * ip-X-X-X-X.ap-northeast-1.compute.internal-application.var.log.containers.backend-app-XXXXX
+      
 ## CD環境
 ### 1. CodePipelineの作成
 * TBD
@@ -316,6 +362,12 @@ kubectl delete deployment bff-app -n demo-app
 kubectl delete deployment backend-app -n demo-app
 
 helm uninstall aws-load-balancer-controller -n kube-system
+
+curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluent-bit-quickstart.yaml | sed 's/{{cluster_name}}/'${EKS_CLUSTER_NAME}'/;s/{{region_name}}/'${AWS_REGION}'/;s/{{http_server_toggle}}/"'${FluentBitHttpServer}'"/;s/{{http_server_port}}/"'${FluentBitHttpPort}'"/;s/{{read_from_head}}/"'${FluentBitReadFromHead}'"/;s/{{read_from_tail}}/"'${FluentBitReadFromTail}'"/' | kubectl delete -f -
+
+aws iam detach-role-policy \
+  --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
+  --role-name $WORKER_NODE_ROLE_NAME
 
 eksctl delete cluster --name $EKS_CLUSTER_NAME
 ```

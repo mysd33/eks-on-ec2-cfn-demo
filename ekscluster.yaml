@@ -53,13 +53,14 @@ managedNodeGroups:
   - name: managed-ng-1
     labels:
       role: workers
-    #instanceType: m5.large
-    instanceType: t2.small
+    instanceType: m5.large
+    #instanceType: t2.small
     desiredCapacity: 2
     minSize: 2
     maxSize: 4
     volumeSize: 80
-    privateNetworking: true
+    privateNetworking: true    
+
 
 cloudWatch:
   clusterLogging:
