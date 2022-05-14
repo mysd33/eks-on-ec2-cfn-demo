@@ -292,9 +292,6 @@ envsubst < k8s-backend-deployment.yaml | kubectl apply -f -
 #Podの起動確認しておくとよい
 kubectl get pod -n demo-app
 
-#CLBロードバランサの作成（on EC2のみで動作）の場合は、Service/Ingressを作成せず以下実行
-#kubectl apply -f k8s-backend-clb.yaml
-
 #Serviceの作成
 kubectl apply -f k8s-backend-service.yaml
 
@@ -304,6 +301,9 @@ kubectl apply -f k8s-backend-ingress.yaml
 #Ingressの作成確認
 kubectl get ingress/backend-app-ingress -n demo-app
 ```
+
+* （補足）ALB/Ingressの変わりに、CLBでロードバランサの作成（on EC2のみで動作）をしたい場合は、上記でService/Ingressを作成せず以下実行
+  * kubectl apply -f k8s-backend-clb.yaml
 
 * BFF APの作成
 ```sh
@@ -318,9 +318,6 @@ envsubst < k8s-bff-deployment.yaml | kubectl apply -f -
 #Podの起動確認しておくとよい
 kubectl get pod -n demo-app
 
-#CLBロードバランサの作成（on EC2のみで動作）の場合は、Service/Ingressを作成せず以下実行
-#kubectl apply -f k8s-bff-clb.yaml
-
 #Serviceの作成
 kubectl apply -f k8s-bff-service.yaml
 
@@ -331,6 +328,9 @@ envsubst < k8s-bff-ingress.yaml | kubectl apply -f -
 #Ingressの作成確認
 kubectl get ingress/bff-app-ingress -n demo-app
 ```
+
+* （補足）ALB/Ingressの変わりに、CLBでロードバランサの作成（on EC2のみで動作）をしたい場合は、上記でService/Ingressを作成せず以下実行
+  * kubectl apply -f k8s-bff-clb.yaml
 
 ### 6. APの実行確認
 * VPCのパブリックサブネット上にBationのEC2を起動
