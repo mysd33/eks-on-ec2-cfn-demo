@@ -83,30 +83,45 @@ aws cloudformation create-stack --stack-name Backend-CodeBuild-Stack --template-
 ### 1. VPCおよびサブネット、Publicサブネット向けInternetGateway等の作成
 * 以下のコマンドを実行する。
 ```sh
-aws cloudformation validate-template --template-body file://amazon-eks-vpc-private-subnets.yaml
-aws cloudformation create-stack --stack-name EKS-VPC-Stack --template-body file://amazon-eks-vpc-private-subnets.yaml
+aws cloudformation validate-template --template-body file://cfn-vpc.yaml
+aws cloudformation create-stack --stack-name EKS-VPC-Stack --template-body file://cfn-vpc.yaml
+
+#以下サイトにあるAWS提供のVPCとNATGateway等作成するCfnテンプレートをベースした場合の実行例も残しておく
+#https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/creating-a-vpc.html
+#aws cloudformation validate-template --template-body file://amazon-eks-vpc-private-subnets.yaml
+#aws cloudformation create-stack --stack-name EKS-VPC-Stack --template-body file://amazon-eks-vpc-private-subnets.yaml
 ```
 * なお、ロードバランサーよる自動サブネット検出のため、作成されるサブネットには以下のタグを付与されるようにしている。
-  * 外部ロードバランサが仕様するパブリックサブネット
+  * 外部ロードバランサが使用するパブリックサブネット
     * kubernetes.io/role/elb : 1
-  * 内部ロードバランサが仕様するプライベートサブネット 
+  * 内部ロードバランサが使用するプライベートサブネット 
     * kubernetes.io/role/internal-elb : 1
   * 参考
     * https://aws.amazon.com/jp/premiumsupport/knowledge-center/eks-vpc-subnet-discovery
 
-* TODO: 以下のサイトにあるCfnサンプルテンプレートをベースしているので、カスタマイズ版を作成予定
-  * https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/creating-a-vpc.html
-    * Cfnサンプルテンプレート
-      * https://amazon-eks.s3.us-west-2.amazonaws.com/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
-* TODO: NAT Gatewayの作成も含まれているので、いずれ別ファイルのテンプレートにする
 ### 2. Security Groupの作成
-* TODO: Batsionの追加等で、必要なSecurity Groupの作成
+* Batsion等で、必要なSecurity Groupの作成
+```sh
+aws cloudformation validate-template --template-body file://cfn-sg.yaml
+aws cloudformation create-stack --stack-name EKS-SG-Stack --template-body file://cfn-sg.yaml
+```
+* 必要に応じて、端末の接続元IPアドレス等のパラメータを指定
+    * 「--parameters ParameterKey=TerminalCidrIP,ParameterValue=X.X.X.X/X」
+      * 後続の手順で環境変数「TERMINAL_CIDR=X.X.X.X/X」で指定するものと同じ
 ### 3. VPC Endpointの作成とプライベートサブネットのルートテーブル更新
-* TODO: 完全Private化のため、NATGatewayリソースの削除しVPC Endpointを作成
+* TODO: 現時点では未対応。完全Private化のため、NATGatewayの代わりにVPC Endpoint作成するように変更予定。
   * 参考
     * https://docs.aws.amazon.com/ja_jp/eks/latest/userguide/private-clusters.html   
     * なお、eksctlで完全Privateなクラスタ設定が可能だが、全てPrivate Subnetのみで構築となるので、今回のようなPublic SubnetにALBを配置し、以降はPrivate Subnet上のk8sリソース上のAPへアクセスするといったIngressの設定ができないので使わない。
        * https://eksctl.io/usage/eks-private-cluster/
+
+### 4. NAT Gatewayの作成とプライベートサブネットのルートテーブル更新
+* 現時点ではVPC Endpoint未対応のためNAT Gatewayを作成
+* TODO: VPC Endpoint対応したら任意作成とする
+```sh
+aws cloudformation validate-template --template-body file://cfn-ngw.yaml
+aws cloudformation create-stack --stack-name EKS-NATGW-Stack --template-body file://cfn-ngw.yaml
+```
 ## DB環境
 * TBD:　今後Aurora等のRDBリソースのサンプル作成を検討
 
@@ -119,12 +134,15 @@ AWS_ACCOUNT_ID=(AWSアカウントID)
 AWS_REGION=(リージョン) #例：AWS_REGION=ap-northeast-1
 EKS_CLUSTER_NAME=demo-eks-cluster #作成するEKSのクラスタ名
 K8S_VERSION=1.22 #インストールしたkubectlのバージョン
-#CloudFormationの出力表示で「VpcId」の内容を確認
+#CloudFormation（EKS-VPC-Stack）の出力表示で「VpcId」の内容を確認
 VPC_ID=(EKSクラスタのVPC_ID)
-#CloudFormationの出力表示で「SubnetIds」の内容を確認
+#CloudFormation（EKS-VPC-Stack）の出力表示で「PublicSubnetOneId」の内容を確認
 PUB_SUBNET1_ID=（1つ目のパブリックサブネットのID）
-PUB_SUBNET2_ID=（2つ目のプライベートサブネットのID）
-PRIV_SUBNET1_ID=（1つ目のパブリックサブネットのID）
+#CloudFormation（EKS-VPC-Stack）の出力表示で「PublicSubnetTwoId」の内容を確認
+PUB_SUBNET2_ID=（2つ目のパブリックサブネットのID）
+#CloudFormation（EKS-VPC-Stack）の出力表示で「PrivateSubnetOneId」の内容を確認
+PRIV_SUBNET1_ID=（1つ目のプライベートサブネットのID）
+#CloudFormation（EKS-VPC-Stack）の出力表示で「PrivateSubnetTwoId」の内容を確認
 PRIV_SUBNET2_ID=（2つ目のプライベートサブネットのID）
 #ECRのベースアドレス
 ECR_HOST=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
@@ -139,9 +157,11 @@ export PUB_SUBNET2_ID
 export PRIV_SUBNET1_ID
 export PRIV_SUBNET2_ID
 export ECR_HOST
+export TERMINAL_CIDR
 ```
 ### 2. EKSクラスタの作成
-* 以下のeksctlコマンドの実行を実行し、ManagedNodeGroupでEKSクラスタを作成
+* 以下のeksctlコマンドを実行し、ManagedNodeGroupでEKSクラスタを作成
+  * 実行すると、CloudFormationのスタックとして作成される
 ```sh
 #Dry Run
 envsubst < ekscluster.yaml | eksctl create cluster -f - --dry-run
@@ -167,7 +187,7 @@ kubectl get pods --all-namespaces -o wide
     * https://eksctl.io/usage/vpc-networking/
   * コントロールプレーンのCloudWatch Logsの有効化
     * https://eksctl.io/usage/cloudwatch-cluster-logging/
-  * Managed NodeGroup
+  * Managed NodeGroup対応
     * https://eksctl.io/usage/eks-managed-nodes/
  
 * TODO: ClusterConfigファイルに、addonsでaws-load-balancer-controllerの記載を追加するとどうなるのか試してみる
@@ -225,12 +245,12 @@ kubectl logs -n kube-system deployment.apps/aws-load-balancer-controller
     * /aws/eks/demo-eks-cluster/cluster
 * データプレーンのログ
   * EKS on EC2の場合、以下の対応が必要
-    * CloudWatch Logsへログを送信しメトリクス表示するFluentBitをDaemonSetとしてセットアップ
+    * CloudWatch Logsへログを送信するFluentBitをDaemonSetとしてセットアップ
       * 参考
         * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-logs-FluentBit.html
 * データプレーンのメトリックス    
   * EKS on EC2の場合、以下の対応が必要
-    * CloudWatch Container Insightsへメトリクスを収集するようCloudWatchエージェントをDaemonSetとしてセットアップ
+    * CloudWatch Container Insightsへメトリックスを収集するようCloudWatchエージェントをDaemonSetとしてセットアップ
       * 参考
         * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-metrics.html
     * AWS Distro for OpenTelemetry (ADOT)を使用してクラスター上のDaemonSetとしてセットアップする方法もあるが、今回は実施していない。
@@ -241,18 +261,6 @@ kubectl logs -n kube-system deployment.apps/aws-load-balancer-controller
   * 参考
     * https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/monitoring/Container-Insights-setup-EKS-quickstart.html
 
-* ワーカノードのIAMロールにCloudWatchAgentServerPolicyポリシーをアタッチ
-```sh
-#マネージドコンソール等で、EC2のワーカーノードのIAMロールを確認
-WORKER_NODE_ROLE_NAME=（ワーカーノードのインスタンスのIAMロール名）
-#例：IAMロールARNの後ろの部分
-#WORKER_NODE_ROLE_NAME=eksctl-demo-eks-cluster-nodegroup-NodeInstanceRole-1LMOJT8MZM3F
-
-aws iam attach-role-policy \
-  --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
-  --role-name $WORKER_NODE_ROLE_NAME
-```
-
 ```sh
 FluentBitHttpPort='2020'
 FluentBitReadFromHead='Off'
@@ -261,8 +269,11 @@ FluentBitReadFromHead='Off'
 curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluent-bit-quickstart.yaml | sed 's/{{cluster_name}}/'${EKS_CLUSTER_NAME}'/;s/{{region_name}}/'${AWS_REGION}'/;s/{{http_server_toggle}}/"'${FluentBitHttpServer}'"/;s/{{http_server_port}}/"'${FluentBitHttpPort}'"/;s/{{read_from_head}}/"'${FluentBitReadFromHead}'"/;s/{{read_from_tail}}/"'${FluentBitReadFromTail}'"/' | kubectl apply -f - 
 ```
 
-* CloudWatchエージェントとFulentBitがデプロイされたことを確認
+* CloudWatchエージェントとFulentBitのDaemonSet、Podがデプロイされたことを確認
 ```sh
+#DaemonSetの確認
+kubectl get daemonset -n amazon-cloudwatch
+#Podの確認
 kubectl get pods -n amazon-cloudwatch
 ```
 
@@ -314,30 +325,34 @@ kubectl get pod -n demo-app
 kubectl apply -f k8s-bff-service.yaml
 
 #Ingressの作成
-kubectl apply -f k8s-bff-ingress.yaml
+#なお、マニフェストにALBへの接続元端末のCIDR制限が環境変数TERMINAL_CIDRで設定されている
+envsubst < k8s-bff-ingress.yaml | kubectl apply -f -
 
 #Ingressの作成確認
 kubectl get ingress/bff-app-ingress -n demo-app
 ```
 
 ### 6. APの実行確認
-* TODO: bationのEC2とSecurityGroupの作成手順の追加
+* VPCのパブリックサブネット上にBationのEC2を起動
+```sh
+aws cloudformation validate-template --template-body file://cfn-bastion-ec2.yaml
+aws cloudformation create-stack --stack-name Demo-Bastion-Stack --template-body file://cfn-bastion-ec2.yaml
+```
+  * 必要に応じてキーペア名等のパラメータを指定
+    * 「--parameters ParameterKey=KeyPairName,ParameterValue=myKeyPair」
+  * BastionのEC2のアドレスは、CloudFormationの「Demo-Bastion-Stack」スタックの出力「BastionDNSName」のURLを参照
 
 * Backendアプリケーションの確認
-  * VPC内のbationを作成し、curlコマンドで動作確認
-```sh
-curl http://(ロードバランサのDNS名)/backend/api/v1/users
-```
+  * EC2にSSHでログインし、以下のコマンドを「curl http://(Private ALBのDNS名)/backend/api/v1/users」を入力するとバックエンドサービスAPのJSONレスポンスが返却    
+  * EC2、curlコマンドで動作確認
 
 * BFFアプリケーションの確認
-  * ブラウザで確認
+  * ブラウザで「http://(Public ALBのDNS名)/backend-for-frontend/index.html」を入力しフロントエンドAPの画面が表示される
     * サンプルAPは、ECS用のCloudFormationサンプルと共用しているので、画面に「Hello! AWS ECS sample!」と表示されるが気にしなくてよい。
-```sh
-http://(ロードバランサのDNS名)/backend-for-frontend/index.html
-```
+
 * APログの確認
   * うまく動作しない場合、APログ等にエラーが出ていないか確認するとよい
-  * Cloud Watch Logの以下のロググループ
+  * CloudWatch Logsの以下のロググループ
     * /aws/containerinsights/demo-eks-cluster/application
       * ip-X-X-X-X.ap-northeast-1.compute.internal-application.var.log.containers.bff-app-XXXXX
       * ip-X-X-X-X.ap-northeast-1.compute.internal-application.var.log.containers.backend-app-XXXXX
@@ -365,9 +380,9 @@ helm uninstall aws-load-balancer-controller -n kube-system
 
 curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluent-bit-quickstart.yaml | sed 's/{{cluster_name}}/'${EKS_CLUSTER_NAME}'/;s/{{region_name}}/'${AWS_REGION}'/;s/{{http_server_toggle}}/"'${FluentBitHttpServer}'"/;s/{{http_server_port}}/"'${FluentBitHttpPort}'"/;s/{{read_from_head}}/"'${FluentBitReadFromHead}'"/;s/{{read_from_tail}}/"'${FluentBitReadFromTail}'"/' | kubectl delete -f -
 
-aws iam detach-role-policy \
-  --policy-arn arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy \
-  --role-name $WORKER_NODE_ROLE_NAME
 
 eksctl delete cluster --name $EKS_CLUSTER_NAME
 ```
+
+## その他のCloudFormationのスタック削除
+* 上記のコマンドでk8sリソースとEKSクラスタ等の削除後、残ったCloudFormationのスタックを削除

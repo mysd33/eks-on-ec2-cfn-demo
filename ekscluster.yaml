@@ -50,17 +50,23 @@ vpc:
 #  enabled: true
 
 managedNodeGroups:
-  - name: managed-ng-1
-    labels:
-      role: workers
-    instanceType: m5.large
-    #instanceType: t2.small
-    desiredCapacity: 2
-    minSize: 2
-    maxSize: 4
-    volumeSize: 80
-    privateNetworking: true    
-
+- name: managed-ng-1
+  labels:
+    role: workers
+  instanceType: m5.large
+  #instanceType: t2.small
+  desiredCapacity: 2
+  minSize: 2
+  maxSize: 4
+  volumeSize: 80
+  privateNetworking: true
+  iam:
+    attachPolicyARNs:
+    - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+    - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+    # for CloudWatch Logs Access
+    - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
 
 cloudWatch:
   clusterLogging:
